@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Include FontAwesome CDN -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #control {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    #logo {
+      position: absolute;
+      top: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 250px; /* Adjust size of logo */
+      margin-bottom: 20px;
+      pointer-events: none; /* Make sure logo doesn't interfere with buttons */
+    }
+    
+    #bylogo {
+      position: absolute;
+      top: 650px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 250px; /* Adjust size of logo */
+      margin-bottom: 20px;
+      pointer-events: none; /* Make sure logo doesn't interfere with buttons */
+    }
+
+    iframe {
+      pointer-events: none;
+    }
+
+    /* Start Button Styling */
+    #startButton {
+      position: absolute;
+      top: 500px;
+      padding: 15px 30px;
+      font-size: 18px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s ease;
+      pointer-events: auto;
+    }
+
+    #startButton:hover {
+      background-color: #45a049;
+    }
+
+    /* Stop Button Styling */
+    #stopButton {
+      display: none;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: #f44336;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      transition: background-color 0.3s ease;
+      pointer-events: auto;
+    }
+
+    #stopButton:hover {
+      background-color: #e53935;
+    }
+
+    /* Stop Icon using FontAwesome */
+    #stopButton i {
+      font-size: 20px; /* Adjust icon size */
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'mindar-image-three';
+    import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+    
+    let startButton, stopButton;
+    startButton = document.querySelector("#startButton");
+    stopButton = document.querySelector("#stopButton");
+    stopButton.style.display = 'none';
+        
+    const mindarThree = new MindARThree({
+      container: document.querySelector("#container"),
+      imageTargetSrc: "portrait.mind"
+    });
+
+    const { scene, camera } = mindarThree;
+
+    // Add CSS3DRenderer for the YouTube iframe
+    const cssRenderer = new CSS3DRenderer();
+    cssRenderer.setSize(window.innerWidth, window.innerHeight);
+    cssRenderer.domElement.style.position = 'absolute';
+    cssRenderer.domElement.style.top = '0';
+    document.body.appendChild(cssRenderer.domElement);
+
+    // Create the YouTube iframe
+    const iframe = document.createElement('iframe');
+    iframe.src =  "https://www.youtube.com/embed/zfVyTOnNdhU?autoplay=1&mute=0&controls=0&loop=1&playlist=zfVyTOnNdhU";// Replace with your video URL
+    iframe.width = "555"; // 560
+    iframe.height = "807"; // 315
+    // iframe.allow = "autoplay"; // Allow autoplay
+    iframe.allow = "autoplay; fullscreen; encrypted-media";
+    iframe.style.border = "none";
+
+    // Wrap the iframe in a CSS3DObject
+    const cssObject = new CSS3DObject(iframe);
+    cssObject.position.set(0,-0.30, 0); // Adjust position to align with marker
+    cssObject.scale.set(0.002, 0.0023, 0.002); // Scale the iframe down for AR
+
+    // Add the CSS3DObject to the scene
+    const anchor = mindarThree.addAnchor(0);
+    anchor.group.add(cssObject);
+    
+    // Handle marker detection
+    anchor.onTargetFound = () => {
+        console.log("Marker detected! Playing video.");
+        iframe.src = "https://www.youtube.com/embed/zfVyTOnNdhU?autoplay=1&mute=0&controls=0&loop=1&playlist=zfVyTOnNdhU"; // Ensure the video plays when detected
+    };
+    
+    anchor.onTargetLost = () => {
+        console.log("Marker lost! Stopping video.");
+        iframe.src = ""; // Stop the video when marker is lost
+    };
+
+    // Synchronize Three.js renderer and CSS3DRenderer
+    const start = async () => {
+      await mindarThree.start();
+      const renderer = mindarThree.renderer;
+
+      // Render loop
+      const renderLoop = () => {
+        renderer.render(scene, camera);
+        cssRenderer.render(scene, camera);
+        requestAnimationFrame(renderLoop);
+      };
+      renderLoop();
+    };
+
+    const stop = async () => {
+        // Stop the MindAR session
+        await mindarThree.stop();
+        
+        // Unload YouTube video before removing the iframe
+        if (iframe) {
+            iframe.src = "";
+        }
+    
+        // Remove the CSS3DRenderer DOM element
+        if (cssRenderer && cssRenderer.domElement) {
+            cssRenderer.domElement.remove();
+        }
+    
+        // Hide the stop button and show the start button again (optional)
+        stopButton.style.display = 'none';
+        startButton.style.display = 'block';
+    
+        // Restore logo visibility
+        document.getElementById("logo").style.display = 'block';
+        document.getElementById("bylogo").style.display = 'block';
+    };
+    
+    // Button event listeners
+    startButton.addEventListener("click", () => {
+      start();
+      startButton.style.display = 'none';  // Hide Start button
+      stopButton.style.display = 'block';  // Show Stop button
+      document.getElementById("logo").style.display = 'none';
+      document.getElementById("bylogo").style.display = 'none';
+    });
+
+    stopButton.addEventListener("click", () => {
+      stop();
+      // Refresh the page when Stop button is clicked
+      window.location.reload();
+    });
+  </script>
+
+</head>
+<body>
+  <div id="control">
+    <!-- Logo added here -->
+    <img id="logo" src="https://www.duetvr.com/img/logo.png" alt="Logo">
+
+    <button id="startButton">Click AR</button>
+    <button id="stopButton"><i class="fas fa-times"></i></button>
+    
+    <!-- Powered Logo added here -->
+    <img id="bylogo" src="https://www.duetvr.com/admin/dashboard/ar-greetings/loader.png" alt="Logo">
+  </div>
+  <div id="container"></div>
+</body>
+</html>
